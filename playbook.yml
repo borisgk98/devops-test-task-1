@@ -1,0 +1,109 @@
+---
+- name: Install application to 'default' hosts group
+  hosts: default
+  tasks:
+
+
+  ### Nginx section
+  - name: Install requirements apt packages
+    sudo: yes
+    apt:
+      name: "{{ packages }}"
+      update_cache: yes
+    vars:
+      packages:
+      - nginx
+      - git
+      - postgresql
+      - make
+      - systemd
+
+  - name: Copy nginx conf file
+    sudo: yes
+    copy:
+      src: ./nginx.conf
+      dest: "{{nginxhome}}nginx.conf"
+      owner: root
+      mode: '0644'
+
+  - name: Start and enable nginx service
+    sudo: yes
+    systemd:
+      state: restarted
+      enabled: yes
+      name: nginx
+
+
+  ### Application section
+  - command: python3.6
+    register: result
+    ignore_errors: True
+
+  - name: Install python3.6
+    sudo: yes
+    shell: |
+      wget https://www.python.org/ftp/python/3.6.3/Python-3.6.3.tgz
+      tar xvf Python-3.6.3.tgz
+      cd Python-3.6.3
+      ./configure --enable-optimizations --enable-shared
+      make -j8
+      sudo make altinstall  
+    when: result is failed  
+
+  - name: Install requirements apt packages
+    sudo: yes
+    apt:
+      name: "{{ packages }}"
+      update_cache: yes
+    vars:
+      packages:
+      - pip3
+
+  - name: Add user python-sample-app for run application
+    sudo: yes
+    user:
+      name: "{{ appuser }}"
+
+  - name: Create dir for application
+    sudo: yes
+    file:
+      path: "{{ appdir }}"
+      owner: "{{ appuser }}"
+      mode: '0755'
+      state: directory
+
+  - name: Get application sources 
+    become: yes
+    become_user: "{{ appuser }}" 
+    become_method: sudo
+    git:
+      repo: "{{ appsource }}"
+      dest: "{{ appdir }}"
+    
+  - name: Install requirements pip packages
+    pip:
+      requirements: "{{ requirements }}"
+      executable: pip3
+    vars:
+      requirements: "{{ appdir }}/requirements.txt"
+
+  - name: Copy service file
+    sudo: yes
+    copy:
+      src: ./python-sample-app.service
+      dest: /lib/systemd/system/python-sample-app.service
+      owner: root
+      mode: '0644'
+
+  - name: Start and enable nginx service
+    sudo: yes
+    systemd:
+      state: start
+      enabled: yes
+      name: python-sample-app
+
+  vars:
+    appdir: /opt/python-sample-app/
+    appuser: python-sample-app
+    appsource: "https://github.com/mbaran0v/python-sample-app.git"
+    nginxhome: /etc/nginx/

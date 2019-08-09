@@ -1,0 +1,10 @@
+[Unit]
+Description=The NGINX HTTP and reverse proxy server
+After=syslog.target network.target remote-fs.target nss-lookup.target
+
+[Service]
+ExecStartPre=flask db upgrade && export FLASK_APP=/opt/python-sample-app/app.py && export POSTGRESQL_URL=postgresql://worker:worker@localhost/app
+ExecStart=/usr/bin/python3.6 /opt/python-sample-app/app.py 
+
+[Install]
+WantedBy=multi-user.target
